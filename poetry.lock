@@ -1491,7 +1491,7 @@ pyobjc-core = ">=9.1.1"
 
 [[package]]
 name = "pyqt5"
-version = "5.15.11"
+version = "5.15.7"
 description = "Python bindings for the Qt cross platform application toolkit"
 category = "main"
 optional = false
