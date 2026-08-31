@@ -2,16 +2,16 @@ default:
     just --list
 
 build-requirements:
-    if [ ! -f build/requirements.txt ]; then mkdir -p build && poetry export --without-hashes -o build/requirements.txt; fi
+    if [ ! -f build/requirements.txt ]; then mkdir -p build && uv pip compile pyproject.toml -q --universal --no-annotate --no-header -o build/requirements.txt; fi
 
 build:
-    poetry build
+    uv build
 
 build-wheel:
-    if [ ! -f dist/*.whl ]; then poetry build -f wheel; fi
+    if [ ! -f dist/*.whl ]; then uv build --wheel; fi
 
 build-sdist:
-    if [ ! -f dist/*.tar.gz ]; then poetry build -f sdist; fi
+    if [ ! -f dist/*.tar.gz ]; then uv build --sdist; fi
 
 build-linux-meta:
     ./scripts/linux_meta/build.sh
@@ -37,11 +37,23 @@ build-win-pyinstaller: build-requirements
 build-win-package: build-win-pyinstaller
     ./scripts/windows/build_packages.sh
 
+build-win-chocolatey:
+    ./scripts/chocolatey/build.sh all
+
 build-macos-pyinstaller: build-requirements
-    ./scripts/pyinstaller/build_mac.sh
+    BUILD_MACOS_ARCH=x86_64 ./scripts/pyinstaller/build_mac.sh
 
 build-macos-package: build-macos-pyinstaller
-    ./scripts/macos/build_dmg.sh
+    BUILD_MACOS_ARCH=x86_64 ./scripts/macos/build_dmg.sh
+
+build-macos-pyinstaller-arm64: build-requirements
+    BUILD_MACOS_ARCH=arm64 ./scripts/pyinstaller/build_mac.sh
+
+build-macos-package-arm64: build-macos-pyinstaller-arm64
+    BUILD_MACOS_ARCH=arm64 ./scripts/macos/build_dmg.sh
+
+clean:
+    rm -rf dist build
 
 clean-pyinstaller-dist:
     find dist -maxdepth 1 -mindepth 1 -type d -exec rm -r {} \;
@@ -52,8 +64,29 @@ generate-ui:
 generate-resources:
     ./scripts/qt_resources/build_resources.sh
 
+translations-build-main:
+    ./scripts/translations/build_ts.sh
+
+translations-upload-main:
+    ./scripts/translations/upload.sh
+
+translations-download-approved:
+    ./scripts/translations/download.sh
+
+translations-update-contributors:
+    ./scripts/translations/update_contributors.sh
+
 changelog:
-    conventional-changelog -p conventionalcommits -u -a --stdout | sed -n '0,/\[0\.1\.0\]:/d; p'
+    conventional-changelog -p conventionalcommits -u -i /dev/null --stdout
 
 changelog-all:
-    conventional-changelog -u -a --stdout | sed -n '0,/\[0\.1\.0\]:/d; p'
+    conventional-changelog -u -i /dev/null --stdout
+
+release:
+    commit-and-tag-version
+
+release-dry:
+    commit-and-tag-version --dry-run
+
+update-actions:
+    actions-up --style preserve -y

@@ -3,7 +3,7 @@ import logging
 import subprocess
 
 from PyQt5.QtCore import QUrl
-from PyQt5.QtGui import QDesktopServices, QIcon, QPalette
+from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QCheckBox, QComboBox, QDialog, QLineEdit, QSpinBox
 
 from gridplayer.dialogs.messagebox import QCustomMessageBox
@@ -12,6 +12,9 @@ from gridplayer.params import env
 from gridplayer.params.languages import LANGUAGES
 from gridplayer.params.static import (
     AudioChannelMode,
+    ColorScheme,
+    DropAction,
+    DropModifier,
     GridMode,
     SeekSyncMode,
     URLResolver,
@@ -23,7 +26,9 @@ from gridplayer.params.static import (
 from gridplayer.settings import Settings
 from gridplayer.utils import log_config
 from gridplayer.utils.app_dir import get_app_data_dir
+from gridplayer.utils.keymap import default_keymap, merge_keymap
 from gridplayer.utils.qt import qt_connect, translate
+from gridplayer.widgets.keymap_tree_view import KeymapEditor
 from gridplayer.widgets.language_list import LanguageList
 from gridplayer.widgets.resolver_patterns_list import ResolverPatternsList
 
@@ -74,21 +79,29 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             "player/inhibit_screensaver": self.playerInhibitScreensaver,
             "player/one_instance": self.playerOneInstance,
             "player/stay_on_top": self.playerStayOnTop,
+            "player/start_maximized": self.playerStartMaximized,
+            "player/start_fullscreen": self.playerStartFullscreen,
             "player/show_overlay_border": self.playerShowOverlayBorder,
+            "player/color_scheme": self.playerColorScheme,
             "player/language": self.listLanguages,
+            "player/keymap": self.keymapEditor,
             "player/recent_list_enabled": self.playerRecentList,
             "player/recent_list_max_size": self.playerRecentListSize,
             "playlist/grid_mode": self.gridMode,
             "playlist/grid_fit": self.gridFit,
             "playlist/grid_size": self.gridSize,
             "playlist/shuffle_on_load": self.gridShuffleOnLoad,
+            "playlist/drop_action_internal": self.dropActionInternal,
+            "playlist/drop_action_external": self.dropActionExternal,
+            "playlist/drop_modifier": self.dropModifier,
             "playlist/save_position": self.playlistSavePosition,
             "playlist/save_state": self.playlistSaveState,
             "playlist/save_window": self.playlistSaveWindow,
             "playlist/seek_sync_mode": self.playlistSeekSyncMode,
             "playlist/track_changes": self.playlistTrackChanges,
-            "playlist/disable_click_pause": self.playlistDisableClickPause,
-            "playlist/disable_wheel_seek": self.playlistDisableWheelSeek,
+            "playlist/disable_mouse_click_events": self.playlistDisableClickEvents,
+            "playlist/disable_mouse_wheel_events": self.playlistDisableWheelEvents,
+            "playlist/disable_overlay": self.playlistDisableOverlay,
             "video_defaults/aspect": self.videoAspect,
             "video_defaults/transform": self.videoTransform,
             "video_defaults/repeat": self.repeatMode,
@@ -110,6 +123,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             "logging/log_limit_backups": self.logLimitBackups,
             "internal/opaque_hw_overlay": self.miscOpaqueHWOverlay,
             "internal/fake_overlay_invisibility": self.miscFakeOverlayInvisibility,
+            "internal/force_native_drag_events": self.miscForceNativeDragEvents,
             "streaming/hls_via_streamlink": self.streamingHLSVIAStreamlink,
             "streaming/resolver_priority": self.streamingResolverPriority,
             "streaming/resolver_priority_patterns": self.streamingResolverPriorityPatterns,
@@ -140,26 +154,26 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             self.section_misc.hide()
             self.miscOpaqueHWOverlay.hide()
             self.miscFakeOverlayInvisibility.hide()
+            self.miscForceNativeDragEvents.hide()
 
     def ui_customize_section_index(self):
         font = self.section_index.font()
         font.setPixelSize(16)
         self.section_index.setFont(font)
 
-        pal = self.section_index.palette()
-        col = pal.color(QPalette.Active, QPalette.Text)
-        pal.setColor(QPalette.Disabled, QPalette.Text, col)
-        self.section_index.setPalette(pal)
-
     def ui_fill(self):
         self.fill_playerVideoDriver()
         self.fill_gridMode()
+        self.fill_dropActionInternal()
+        self.fill_dropActionExternal()
+        self.fill_dropModifier()
         self.fill_videoAspect()
         self.fill_videoTransform()
         self.fill_repeatMode()
         self.fill_logLevel()
         self.fill_logLevelVLC()
         self.fill_language()
+        self.fill_colorScheme()
         self.fill_streamQuality()
         self.fill_playlistSeekSyncMode()
         self.fill_streamingResolverPriority()
@@ -219,6 +233,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
     def switch_page(self, page_name):
         pages_map = {
             translate("SettingsDialog", "Player"): self.page_general_player,
+            translate("SettingsDialog", "Shortcuts"): self.page_general_shortcuts,
             translate("SettingsDialog", "Language"): self.page_general_language,
             translate("SettingsDialog", "Playlist"): self.page_defaults_playlist,
             translate("SettingsDialog", "Video"): self.page_defaults_video,
@@ -319,6 +334,48 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
 
         _fill_combo_box(self.gridMode, grid_modes)
 
+    def fill_dropActionInternal(self):
+        actions = {
+            DropAction.INSERT: self.tr("Move / Swap"),
+            DropAction.REPLACE: self.tr("Replace"),
+        }
+        _fill_combo_box(self.dropActionInternal, actions)
+
+    def fill_dropActionExternal(self):
+        actions = {
+            DropAction.INSERT: self.tr("Add"),
+            DropAction.REPLACE: self.tr("Replace"),
+        }
+        _fill_combo_box(self.dropActionExternal, actions)
+
+    def fill_dropModifier(self):
+        # DropModifier.CTRL is Qt.ControlModifier: Ctrl on Win/Linux, Cmd on macOS.
+        # Qt.MetaModifier is the Mac Control key — do not use that label here.
+        if env.IS_MACOS:
+            modifiers = {
+                DropModifier.SHIFT: self.tr("Shift"),
+                DropModifier.CTRL: self.tr("Cmd"),
+                DropModifier.ALT: self.tr("Option"),
+                DropModifier.NONE: self.tr("Disabled"),
+            }
+        else:
+            modifiers = {
+                DropModifier.SHIFT: self.tr("Shift"),
+                DropModifier.CTRL: self.tr("Ctrl"),
+                DropModifier.ALT: self.tr("Alt"),
+                DropModifier.NONE: self.tr("Disabled"),
+            }
+        _fill_combo_box(self.dropModifier, modifiers)
+        if env.IS_LINUX:
+            # GNOME/Files only exposes Shift to this X11 window. Don't hide Ctrl/Alt:
+            # they work inside the player, and on KDE for file-manager drops too.
+            hint = self.tr(
+                "On GNOME, dropping files from the file manager only honors Shift. "
+                "Ctrl and Alt still work when dragging videos inside the player."
+            )
+            self.dropModifier.setToolTip(hint)
+            self.dropModifierLabel.setToolTip(hint)
+
     def fill_playerVideoDriver(self):
         if env.IS_MACOS:
             video_drivers = {
@@ -339,6 +396,15 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
     def fill_language(self):
         for language in LANGUAGES:
             self.listLanguages.add_language_row(language)
+
+    def fill_colorScheme(self):
+        schemes = {
+            ColorScheme.SYSTEM: self.tr("System"),
+            ColorScheme.LIGHT: self.tr("Light"),
+            ColorScheme.DARK: self.tr("Dark"),
+        }
+
+        _fill_combo_box(self.playerColorScheme, schemes)
 
     def fill_streamQuality(self):
         quality_codes = {
@@ -415,6 +481,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             QComboBox: _set_combo_box,
             LanguageList: lambda e, v: e.setValue(v),
             ResolverPatternsList: lambda e, v: e.setDataRows(v),
+            KeymapEditor: lambda e, v: e.set_bindings(
+                merge_keymap(default_keymap(), v)
+            ),
         }
 
         for setting, element in self.settings_map.items():
@@ -435,6 +504,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             QComboBox: "currentData",
             LanguageList: "value",
             ResolverPatternsList: "rows_data",
+            KeymapEditor: "get_sparse_bindings",
         }
 
         for setting, element in self.settings_map.items():

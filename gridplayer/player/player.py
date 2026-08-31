@@ -77,10 +77,14 @@ class Player(QWidget, ManagersManager):
             ],
             "drag_n_drop": [
                 ("videos_swapped", "grid.reload_video_grid"),
+                ("videos_swapped", "active_block.update_active_under_mouse"),
                 ("videos_dropped", "video_blocks.add_videos"),
                 ("videos_dropped", "window_state.activate_window"),
                 ("videos_dropped", "recent_list.add_recent_videos"),
                 ("playlist_dropped", "playlist.load_playlist_file"),
+                ("set_drag_ui", "video_blocks.cmd_set_drag_ui"),
+                ("set_drag_ui", "window_state.activate_window"),
+                ("set_drag_ui", "active_block.update_active_under_mouse"),
             ],
             "single_mode": [
                 ("mode_changed", "grid.adapt_grid"),
@@ -96,19 +100,41 @@ class Player(QWidget, ManagersManager):
                 ("set_log_level", "video_driver.set_log_level"),
                 ("set_log_level_vlc", "video_driver.set_log_level_vlc"),
                 ("set_recent_list_enabled", "recent_list.set_recent_list_state"),
+                ("keymap_changed", "actions.apply_bindings"),
+                (
+                    "set_disable_mouse_click_events",
+                    "video_blocks.set_disable_mouse_click_events",
+                ),
+                (
+                    "set_disable_mouse_wheel_events",
+                    "video_blocks.set_disable_mouse_wheel_events",
+                ),
+                ("set_disable_overlay", "video_blocks.set_disable_overlay"),
             ],
             "playlist": [
                 ("s.arguments_received", "process_arguments"),
                 ("playlist_file_loaded", "recent_list.add_recent_playlist"),
+                ("playlist_saved", "recent_list.add_recent_playlist"),
                 ("playlist_closed", "video_blocks.close_all"),
                 ("playlist_closed", "window_state.restore_to_minimum"),
+                ("video_blocks.video_count_changed", "on_video_count_changed"),
                 ("window_state_loaded", "window_state.restore_window_state"),
                 ("grid_state_loaded", "grid.set_grid_state"),
                 ("snapshots_loaded", "snapshots.set_snapshots"),
                 ("seek_sync_mode_loaded", "video_blocks.set_seek_sync_mode"),
                 ("shuffle_on_load_loaded", "video_blocks.set_shuffle_on_load"),
-                ("disable_click_pause_loaded", "video_blocks.set_disable_click_pause"),
-                ("disable_wheel_seek_loaded", "video_blocks.set_disable_wheel_seek"),
+                (
+                    "disable_mouse_click_events_loaded",
+                    "video_blocks.set_disable_mouse_click_events",
+                ),
+                (
+                    "disable_mouse_wheel_events_loaded",
+                    "video_blocks.set_disable_mouse_wheel_events",
+                ),
+                (
+                    "disable_overlay_loaded",
+                    "video_blocks.set_disable_overlay",
+                ),
                 ("videos_loaded", "video_blocks.add_videos"),
                 ("alert", "window_state.activate_window"),
                 ("error", "dialogs.error"),
@@ -128,6 +154,7 @@ class Player(QWidget, ManagersManager):
                 ("videos_added", "video_blocks.add_videos"),
                 ("videos_added", "window_state.activate_window"),
                 ("playlist_opened", "playlist.load_playlist_file"),
+                ("error", "dialogs.error"),
             ],
         }
 
@@ -145,13 +172,17 @@ class Player(QWidget, ManagersManager):
             ]
 
         self.global_event_filters.append("mouse_hide")
+        # Linux in-window drag is a fake drag (KWin cursor + GNOME modifiers).
+        self.global_event_filters.append("drag_n_drop")
 
         self.event_filters = [
             "window_state",
             "drag_n_drop",
             "active_block",
-            "single_mode",
             "menu",
+            # After other filters: only consumes when a mouse chord matches.
+            # Receives events targeted at the Player (empty chrome), not VideoBlocks.
+            "actions",
         ]
 
         self.init()

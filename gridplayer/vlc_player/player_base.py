@@ -128,6 +128,7 @@ class VlcPlayerBase(ABC):
             "time_changed": self.cb_time_changed,
             "media_parsed_changed": self.cb_parse_changed,
             "buffering": self.cb_buffering,
+            "vout": self.cb_vout,
         }
 
         for event_name, callback in callbacks.items():
@@ -138,6 +139,27 @@ class VlcPlayerBase(ABC):
         self.notify_update_status(
             translate("Video Status", "Buffering"), buffered_percent
         )
+
+    def cb_vout(self, event):
+        # macOS: _adjust_view_initial skips the synchronous vout wait, so
+        # its initial crop/aspect calls run before the video output exists and
+        # are dropped — the video renders uncropped until the next resize.
+        # Re-apply once the output is up. Setting the crop doesn't change
+        # the vout count, so this won't re-fire itself.
+        #
+        # Linux: synchronous vout wait doesn't help sometimes
+        # Windows: seems fine with sync wait, but re-apply here too just in case
+        #
+        # The re-apply is DEFERRED off the libvlc event thread via
+        # _schedule_view_reapply: cb_vout runs inside a libvlc event callback,
+        # so re-entering libvlc setters synchronously here risks a deadlock.
+
+        if self.media is None or self.media.is_audio_only or self.media_input is None:
+            return
+        self._log.debug(
+            f"Video output ready, re-applying view at {self.media_input.size}"
+        )
+        self._schedule_view_reapply()
 
     def cb_playing(self, event):
         self._log.debug("Media playing")
@@ -335,9 +357,6 @@ class VlcPlayerBase(ABC):
 
         self._event_manager.attach_to_media(self._media_input_vlc)
 
-        if not self.media_input.is_live and self.media_input.video.is_paused:
-            self._media_options.append(":start-paused")
-
         if self.media_input.is_audio_only:
             self._media_options.append(":no-video")
 
@@ -352,6 +371,10 @@ class VlcPlayerBase(ABC):
 
     def load_video_st2_set_media(self):
         """Step 2. Start video player with parsed file"""
+
+        # Can happen if spam reload
+        if not self._playlist_player:
+            return
 
         self._log.debug("Setting parsed media to player and waiting for buffering")
 
@@ -522,10 +545,14 @@ class VlcPlayerBase(ABC):
 
     @only_initialized_player
     def adjust_view(self, size, aspect, scale, crop):
+        # Keep the pane size current on every call so the post-vout re-apply
+        # (cb_vout) and _adjust_view_initial use the real laid-out size, not a
+        # stale pre-layout value captured at load.
+        if self.media_input is not None:
+            self.media_input.size = size
+
         if self.media is None:
             # video not loaded yet, video frame resized on init
-            if self.media_input:
-                self.media_input.size = size
             return
 
         crop_aspect, crop_geometry = calc_crop(self.video_dimensions, size, aspect)
@@ -567,11 +594,20 @@ class VlcPlayerBase(ABC):
     def _set_initial_state(self):
         self._log.debug("Ensuring initial state")
 
-        self._set_pause_initial(self.media_input.video.is_paused)
-
         self._adjust_view_initial()
 
+        # Play first (no :start-paused). That option shows frame 0 but
+        # leaves set_time-while-paused broken until the file has actually
+        # played. Seek while playing, then pause
+
         self._set_time_initial(self.media_input.initial_time)
+
+        self._set_pause_initial(self.media_input.video.is_paused)
+
+        # If paused seek again to ensure actual position
+        # in case time drifted while _set_pause_initial
+        if self.media_input.video.is_paused:
+            self._set_time_initial(self.media_input.initial_time)
 
     def _adjust_view_initial(self):
         if self.media.is_audio_only:
@@ -579,11 +615,19 @@ class VlcPlayerBase(ABC):
 
         # wait for video output init
         # otherwise adjust_view won't work
-        # if video is paused it happens on seek
-        # doesn't work on MacOS for some reason
-        if not env.IS_MACOS and not self.media_input.video.is_paused:
+        # doesn't work on MacOS for some reason — cb_vout re-applies there
+        if not env.IS_MACOS:
             self._event_waiter.wait_for("vout", self.init_time_left)
 
+        self._apply_media_input_view()
+
+    def _schedule_view_reapply(self):
+        # Default: apply directly. Threaded subclasses override this to marshal
+        # the call off the libvlc event thread onto their event loop, since
+        # cb_vout runs inside a libvlc event callback and must not re-enter libvlc.
+        self._apply_media_input_view()
+
+    def _apply_media_input_view(self):
         self.adjust_view(
             size=self.media_input.size,
             aspect=self.media_input.video.aspect_mode,
@@ -593,6 +637,10 @@ class VlcPlayerBase(ABC):
 
     def _set_pause_initial(self, is_paused):
         if not self.media_input.is_live and is_paused:
+            if self._media_player.get_state() != vlc.State.Paused:
+                with self._event_waiter.waiting_for("paused", self.init_time_left):
+                    self.set_pause(True)
+
             if self._media_player.get_state() != vlc.State.Paused:
                 raise NotPausedError
 
@@ -644,6 +692,7 @@ class VlcPlayerBase(ABC):
             media_player=self._media_player,
             media_tracks=list(media_tracks),
             is_audio_only=self.media_input.is_audio_only,
+            media_uri=self.media_input.uri,
         )
 
         if not self._tracks_manager.is_video_size_initialized:

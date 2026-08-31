@@ -1,9 +1,9 @@
 app-id: "{APP_ID}"
 runtime: org.kde.Platform
-runtime-version: "5.15-24.08"
+runtime-version: "5.15-25.08"
 sdk: org.kde.Sdk
 base: com.riverbankcomputing.PyQt.BaseApp
-base-version: "5.15-24.08"
+base-version: "5.15-25.08"
 command: "{APP_MODULE}"
 finish-args:
 # OpenGL
@@ -43,3 +43,4 @@ cleanup:
 modules:
 - libvlc.yml
 - dependencies.yml
+- uv_build.yml

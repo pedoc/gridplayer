@@ -7,7 +7,6 @@ from pathlib import Path
 
 from requests import Response
 from streamlink import StreamError
-from streamlink.stream.hls import M3U8, parse_m3u8
 
 try:
     from streamlink.stream.wrappers import StreamIOIterWrapper, StreamIOThreadWrapper

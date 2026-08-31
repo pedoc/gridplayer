@@ -7,7 +7,7 @@ from uuid import uuid4
 from pydantic import UUID4, BaseModel, Field, ValidationError
 from pydantic_extra_types.color import Color
 
-from gridplayer.models.video_uri import AbsoluteFilePath, VideoURI, parse_uri
+from gridplayer.models.video_uri import VideoURI, parse_uri
 from gridplayer.params.static import (
     AudioChannelMode,
     VideoAspect,
@@ -68,7 +68,7 @@ class Video(BaseModel):
 
     @property
     def is_local_file(self):
-        return isinstance(self.uri, AbsoluteFilePath)
+        return isinstance(self.uri, Path) and self.uri.is_absolute()
 
     @property
     def is_http_url(self):

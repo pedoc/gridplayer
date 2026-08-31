@@ -26,6 +26,13 @@ class WindowStateManager(ManagerBase):
         if not env.IS_LINUX and Settings().get("player/stay_on_top"):
             self.parent().setWindowFlag(Qt.WindowStaysOnTopHint)
 
+        self._ctx.is_maximized_pre_fullscreen = all(
+            (
+                Settings().get("player/start_fullscreen"),
+                Settings().get("player/start_maximized"),
+            )
+        )
+
     @property
     def event_map(self):
         return {
@@ -40,6 +47,7 @@ class WindowStateManager(ManagerBase):
             "close": self.parent().close,
             "fullscreen": self.cmd_fullscreen,
             "is_fullscreen": self.parent().isFullScreen,
+            "activate_window": self.activate_window,
         }
 
     def changeEvent(self, event):

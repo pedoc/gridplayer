@@ -94,7 +94,7 @@ update_flathub_git() {
     git config user.email "$GIT_EMAIL"
 
     git submodule add https://github.com/flathub/shared-modules || true
-    (cd "$BUILD_DIR_FLATHUB/shared-modules" && git checkout -q 0529b121864669aa14fac1c67b5684a4bc6542b8)
+    (cd "$BUILD_DIR_FLATHUB/shared-modules" && git checkout -q b8236c7961e3dd447b1b9605375a54a12f9f24b6)
 
     git add .
 
@@ -112,10 +112,8 @@ generate_flathub_git() {
 
     cp "$SCRIPT_DIR"/libvlc/* "$BUILD_DIR_FLATHUB"
 
-    if [ ! -f "$BUILD_DIR/flatpak_python_deps/dependencies.yml" ]; then
-        "$SCRIPT_DIR/generate_dependencies.sh"
-    fi
     cp "$BUILD_DIR/flatpak_python_deps/dependencies.yml" "$BUILD_DIR_FLATHUB/dependencies.yml"
+    cp "$BUILD_DIR/flatpak_python_deps/uv_build.yml" "$BUILD_DIR_FLATHUB/uv_build.yml"
 
     cat "$SCRIPT_DIR/app.yml" "$SCRIPT_DIR/app_git.yml" > "$BUILD_DIR_FLATHUB/$APP_ID.yml"
     replace_app_vars "$BUILD_DIR_FLATHUB/$APP_ID.yml"
@@ -125,6 +123,26 @@ generate_flathub_git() {
     sed -i "s#{GIT_URL}#$FLATPAK_GIT_REPO_URL#g" "$BUILD_DIR_FLATHUB/$APP_ID.yml"
     sed -i "s#{GIT_COMMIT}#$FLATPAK_GIT_COMMIT#g" "$BUILD_DIR_FLATHUB/$APP_ID.yml"
 }
+
+check_commit() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" "https://api.github.com/repos/${FLATPAK_GIT_REPO}/commits/$1")
+    [[ "$code" == "200" ]]
+}
+
+if [ ! -f "$BUILD_DIR/flatpak_python_deps/dependencies.yml" ]; then
+    "$SCRIPT_DIR/generate_dependencies.sh"
+fi
+
+if [ -n "$RELEASE_FOR_COMMIT" ]; then
+    if ! check_commit "$RELEASE_FOR_COMMIT"; then
+        echo "Commit $RELEASE_FOR_COMMIT does not exist"
+        exit 1
+    fi
+
+    update_flathub_git "$RELEASE_FOR_COMMIT"
+    exit 0
+fi
 
 if [ -n "$GENERATE_FOR_COMMIT" ]; then
     update_flathub_git_local "$GENERATE_FOR_COMMIT"

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>732</width>
-    <height>451</height>
+    <height>452</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -48,7 +48,6 @@
         </property>
         <property name="font">
          <font>
-          <weight>75</weight>
           <bold>true</bold>
          </font>
         </property>
@@ -63,6 +62,11 @@
        </item>
        <item>
         <property name="text">
+         <string>Shortcuts</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
          <string>Language</string>
         </property>
        </item>
@@ -72,7 +76,6 @@
         </property>
         <property name="font">
          <font>
-          <weight>75</weight>
           <bold>true</bold>
          </font>
         </property>
@@ -96,7 +99,6 @@
         </property>
         <property name="font">
          <font>
-          <weight>75</weight>
           <bold>true</bold>
          </font>
         </property>
@@ -130,7 +132,7 @@
         </size>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>4</number>
        </property>
        <widget class="QWidget" name="page_general_player">
         <layout class="QVBoxLayout" name="lay_section_player">
@@ -146,6 +148,23 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
+         <item>
+          <layout class="QFormLayout" name="formLayout_color_scheme">
+           <property name="fieldGrowthPolicy">
+            <enum>QFormLayout::FieldsStayAtSizeHint</enum>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="playerColorSchemeLabel">
+             <property name="text">
+              <string>Color scheme</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="playerColorScheme"/>
+           </item>
+          </layout>
+         </item>
          <item>
           <widget class="QCheckBox" name="playerPauseBackgroundVideos">
            <property name="text">
@@ -178,6 +197,20 @@
           <widget class="QCheckBox" name="playerStayOnTop">
            <property name="text">
             <string>Stay on top</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="playerStartMaximized">
+           <property name="text">
+            <string>Start with maximized window</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="playerStartFullscreen">
+           <property name="text">
+            <string>Start in fullscreen mode</string>
            </property>
           </widget>
          </item>
@@ -220,7 +253,6 @@
           <widget class="QLabel" name="section_timeouts">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -334,7 +366,7 @@
          <item>
           <widget class="QLabel" name="label_4">
            <property name="text">
-            <string>&lt;p&gt;If you have a handful of free time and a desire to support this project, please &lt;a href=&quot;https://crowdin.com/project/gridplayer&quot;&gt;help with the translation&lt;/a&gt;. No coding skills or special software is required!&lt;/p&gt;</string>
+            <string>&lt;p&gt;If you have a handful of free time and a desire to support this project, please &lt;a href=&quot;https://crowdin.com/project/gridplayer&quot;&gt;help with the translation&lt;/a&gt;. No coding skills or special software is required!&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/vzhd1701/gridplayer#translations&quot;&gt;Full list of translators&lt;/a&gt;&lt;/p&gt;</string>
            </property>
            <property name="wordWrap">
             <bool>true</bool>
@@ -343,6 +375,25 @@
             <bool>true</bool>
            </property>
           </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="page_general_shortcuts">
+        <layout class="QVBoxLayout" name="lay_page_general_shortcuts">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="KeymapEditor" name="keymapEditor" native="true"/>
          </item>
         </layout>
        </widget>
@@ -388,7 +439,6 @@
           <widget class="QLabel" name="label_10">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -411,7 +461,6 @@
               <widget class="QLabel" name="label_11">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -493,16 +542,23 @@
           </widget>
          </item>
          <item>
-          <widget class="QCheckBox" name="playlistDisableClickPause">
+          <widget class="QCheckBox" name="playlistDisableClickEvents">
            <property name="text">
-            <string>Disable pause with left mouse click</string>
+            <string>Disable mouse click events</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QCheckBox" name="playlistDisableWheelSeek">
+          <widget class="QCheckBox" name="playlistDisableWheelEvents">
            <property name="text">
-            <string>Disable seek with mouse wheel</string>
+            <string>Disable mouse wheel events</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="playlistDisableOverlay">
+           <property name="text">
+            <string>Disable overlay</string>
            </property>
           </widget>
          </item>
@@ -524,71 +580,175 @@
           </layout>
          </item>
          <item>
-          <widget class="QLabel" name="label">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
+          <layout class="QHBoxLayout" name="horizontalLayout_7">
+           <property name="spacing">
+            <number>6</number>
            </property>
-           <property name="text">
-            <string>Grid</string>
+           <property name="rightMargin">
+            <number>0</number>
            </property>
-          </widget>
-         </item>
-         <item>
-          <layout class="QFormLayout" name="formLayout">
-           <property name="fieldGrowthPolicy">
-            <enum>QFormLayout::FieldsStayAtSizeHint</enum>
+           <property name="bottomMargin">
+            <number>0</number>
            </property>
-           <item row="0" column="0">
-            <widget class="QLabel" name="gridModeLabel">
-             <property name="text">
-              <string>Grid mode</string>
+           <item>
+            <layout class="QVBoxLayout" name="verticalLayout_2">
+             <property name="leftMargin">
+              <number>0</number>
              </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QComboBox" name="gridMode"/>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="gridSizeLabel">
-             <property name="text">
-              <string>Grid size</string>
+             <property name="bottomMargin">
+              <number>0</number>
              </property>
-            </widget>
+             <item>
+              <widget class="QLabel" name="label">
+               <property name="font">
+                <font>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="text">
+                <string>Grid</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <layout class="QFormLayout" name="formLayout">
+               <property name="fieldGrowthPolicy">
+                <enum>QFormLayout::FieldsStayAtSizeHint</enum>
+               </property>
+               <item row="0" column="1">
+                <widget class="QComboBox" name="gridMode"/>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="gridSizeLabel">
+                 <property name="text">
+                  <string>Grid size</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QSpinBox" name="gridSize"/>
+               </item>
+               <item row="0" column="0">
+                <widget class="QLabel" name="gridModeLabel">
+                 <property name="text">
+                  <string>Grid mode</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="gridFit">
+               <property name="text">
+                <string>Fit grid cells</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="gridShuffleOnLoad">
+               <property name="text">
+                <string>Shuffle on load</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_6">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
            </item>
-           <item row="1" column="1">
-            <widget class="QSpinBox" name="gridSize"/>
+           <item>
+            <layout class="QVBoxLayout" name="verticalLayout_3">
+             <property name="leftMargin">
+              <number>10</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label">
+               <property name="font">
+                <font>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="text">
+                <string>Drag-n-Drop</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <layout class="QFormLayout" name="formLayout">
+               <property name="fieldGrowthPolicy">
+                <enum>QFormLayout::FieldsStayAtSizeHint</enum>
+               </property>
+               <item row="0" column="1">
+                <widget class="QComboBox" name="dropActionInternal"/>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="dropActionExternalLabel">
+                 <property name="text">
+                  <string>File drop</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QComboBox" name="dropActionExternal"/>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="dropModifierLabel">
+                 <property name="text">
+                  <string>Hold to switch</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <widget class="QComboBox" name="dropModifier"/>
+               </item>
+               <item row="0" column="0">
+                <widget class="QLabel" name="dropActionInternalLabel">
+                 <property name="text">
+                  <string>In-window drag</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_5">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
            </item>
           </layout>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="gridFit">
-           <property name="text">
-            <string>Fit grid cells</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="gridShuffleOnLoad">
-           <property name="text">
-            <string>Shuffle on load</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="verticalSpacer_4">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>40</height>
-            </size>
-           </property>
-          </spacer>
          </item>
         </layout>
        </widget>
@@ -678,7 +838,6 @@
           <widget class="QLabel" name="label_12">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -790,12 +949,14 @@
           <widget class="QLabel" name="label_9">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
            <property name="text">
             <string>VLC Options [&lt;a href=&quot;https://wiki.videolan.org/VLC_command-line_help/&quot;&gt;reference&lt;/a&gt;]</string>
+           </property>
+           <property name="openExternalLinks">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -806,7 +967,6 @@
           <widget class="QLabel" name="section_misc">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -826,6 +986,13 @@
           <widget class="QCheckBox" name="miscFakeOverlayInvisibility">
            <property name="text">
             <string>Fake overlay invisibility (fix overlay on top of other windows)</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="miscForceNativeDragEvents">
+           <property name="text">
+            <string>Force native drag-n-drop for in-window drag</string>
            </property>
           </widget>
          </item>
@@ -907,7 +1074,6 @@
           <widget class="QLabel" name="label_6">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
             </font>
            </property>
@@ -1004,6 +1170,12 @@
    <class>ResolverPatternsList</class>
    <extends>QWidget</extends>
    <header>gridplayer.widgets.resolver_patterns_list</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>KeymapEditor</class>
+   <extends>QWidget</extends>
+   <header>gridplayer.widgets.keymap_tree_view</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

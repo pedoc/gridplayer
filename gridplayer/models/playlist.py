@@ -1,11 +1,13 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from gridplayer.models.grid_state import GridState
 from gridplayer.models.video import Video
+from gridplayer.models.video_uri import parse_uri
 from gridplayer.params.static import SeekSyncMode, WindowState
 from gridplayer.settings import Settings, default_field
 
@@ -20,14 +22,37 @@ class Snapshot(BaseModel):
 
 
 class Playlist(BaseModel):
-    grid_state: GridState = GridState()
+    grid_state: GridState = Field(default_factory=GridState)
     window_state: WindowState | None = None
     videos: VideosList | None = None
     snapshots: dict[int, Snapshot] | None = None
     seek_sync_mode: SeekSyncMode = default_field("playlist/seek_sync_mode")
     shuffle_on_load: bool = default_field("playlist/shuffle_on_load")
-    disable_click_pause: bool = Settings().get("playlist/disable_click_pause")
-    disable_wheel_seek: bool = Settings().get("playlist/disable_wheel_seek")
+    disable_mouse_click_events: bool = default_field(
+        "playlist/disable_mouse_click_events"
+    )
+    disable_mouse_wheel_events: bool = default_field(
+        "playlist/disable_mouse_wheel_events"
+    )
+    disable_overlay: bool = default_field("playlist/disable_overlay")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_mouse_flags(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        if "disable_click_pause" in data and "disable_mouse_click_events" not in data:
+            data["disable_mouse_click_events"] = data.pop("disable_click_pause")
+        else:
+            data.pop("disable_click_pause", None)
+
+        if "disable_wheel_seek" in data and "disable_mouse_wheel_events" not in data:
+            data["disable_mouse_wheel_events"] = data.pop("disable_wheel_seek")
+        else:
+            data.pop("disable_wheel_seek", None)
+
+        return data
 
     @classmethod
     def read(cls, filename):
@@ -96,7 +121,7 @@ class Playlist(BaseModel):
         for idx, uri in enumerate(_parse_video_paths(playlist_in)):
             video_args = video_params.get(idx, {})
 
-            video_args["uri"] = uri
+            video_args["uri"] = parse_uri(uri)
 
             try:
                 videos.append(Video(**video_args))

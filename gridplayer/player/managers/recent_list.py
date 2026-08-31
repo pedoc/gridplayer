@@ -14,6 +14,8 @@ class RecentListManager(ManagerBase):
     videos_added = pyqtSignal(list)
     playlist_opened = pyqtSignal(Path)
 
+    error = pyqtSignal(str)
+
     @property
     def commands(self):
         return {
@@ -61,7 +63,13 @@ class RecentListManager(ManagerBase):
 
         return menu
 
-    def cmd_add_video(self, uri) -> None:
+    def cmd_add_video(self, uri: VideoURI) -> None:
+        if isinstance(uri, Path) and not uri.exists():
+            self.error.emit(
+                "{}\n\n{}".format(translate("Error", "File not found!"), uri)
+            )
+            return
+
         videos = [Video(uri=uri)]
 
         self.add_recent_videos(videos)

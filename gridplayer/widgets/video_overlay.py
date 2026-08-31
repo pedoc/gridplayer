@@ -2,15 +2,16 @@ from PyQt5.QtCore import QEvent, QPoint, QRect, Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QGuiApplication, QPalette, QRegion
 from PyQt5.QtWidgets import (
     QApplication,
-    QGraphicsOpacityEffect,
     QHBoxLayout,
     QStackedLayout,
     QVBoxLayout,
     QWidget,
 )
 
+from gridplayer.params import env
 from gridplayer.params.static import OVERLAY_ACTIVITY_EVENT
-from gridplayer.settings import Settings
+from gridplayer.utils.compositor_linux import should_make_overlay_opaque
+from gridplayer.utils.drop_zone import DropIndicator
 from gridplayer.utils.qt import qt_connect
 from gridplayer.utils.time_txt import get_time_txt
 from gridplayer.widgets.video_overlay_buttons import (
@@ -20,6 +21,7 @@ from gridplayer.widgets.video_overlay_buttons import (
 )
 from gridplayer.widgets.video_overlay_elements import (
     OverlayBorder,
+    OverlayDropIndicator,
     OverlayLabel,
     OverlayProgressBar,
     OverlayShortLabel,
@@ -35,10 +37,10 @@ PROPAGATED_EVENTS = (
     QEvent.MouseButtonDblClick,
     QEvent.Wheel,
     QEvent.ContextMenu,
-    QEvent.DragEnter,
 )
 
 PROPAGATED_EVENTS_FILTERED = (
+    QEvent.DragEnter,
     QEvent.DragMove,
     QEvent.DragLeave,
     QEvent.Drop,
@@ -58,9 +60,12 @@ class OverlayBlock(QWidget):
 
         self.setMouseTracking(True)
 
-        self._set_opacity(0.5)
-
         self.ui_setup()
+
+        self._is_chrome_visible = True
+        self._is_active = False
+
+        self._set_opacity(0.5)
 
         self.ui_customize_dynamic()
 
@@ -104,8 +109,12 @@ class OverlayBlock(QWidget):
         layout_control = QVBoxLayout(self.control_widget)
         layout_control.setContentsMargins(10, 10, 10, 10)
 
+        self.drop_indicator = OverlayDropIndicator(parent=self)
+        self.drop_indicator.hide()
+
         layout_main.addWidget(self.control_widget)
         layout_main.addWidget(self.border_widget)
+        layout_main.addWidget(self.drop_indicator)
 
         self.top_bar = QVBoxLayout()
         self.middle = QHBoxLayout()
@@ -167,12 +176,11 @@ class OverlayBlock(QWidget):
 
     @pyqtSlot(int, int)
     def set_position(self, position, length):
-        position_percent = position / length
+        position = max(0, position)
 
-        position_txt = get_time_txt(position // 1000, length // 1000)
-        length_txt = get_time_txt(length // 1000)
+        if length <= 0:
+            position_txt = get_time_txt(position // 1000)
 
-        if length == -1:
             self.floating_progress.hide()
 
             self.progress_bar.setEnabled(False)
@@ -182,15 +190,21 @@ class OverlayBlock(QWidget):
 
             self.label_progress.text = f"{position_txt}"
             self.label_progress.show()
-        else:
-            self.progress_bar.setEnabled(True)
-            self.progress_bar.show()
 
-            self.progress_bar_placeholder.hide()
+            return
 
-            self.floating_progress.length = length
-            self.label_progress.text = f"{position_txt} / {length_txt}"
-            self.progress_bar.position = position_percent
+        position_percent = position / length
+        position_txt = get_time_txt(position // 1000, length // 1000)
+        length_txt = get_time_txt(length // 1000)
+
+        self.progress_bar.setEnabled(True)
+        self.progress_bar.show()
+
+        self.progress_bar_placeholder.hide()
+
+        self.floating_progress.length = length
+        self.label_progress.text = f"{position_txt} / {length_txt}"
+        self.progress_bar.position = position_percent
 
     @pyqtSlot(float)
     def set_loop_start(self, position):
@@ -255,16 +269,37 @@ class OverlayBlock(QWidget):
 
     @pyqtSlot(bool)
     def set_is_active(self, is_active):
-        self.border_widget.setVisible(is_active)
+        self._is_active = is_active
+        self.border_widget.setVisible(is_active and self._is_chrome_visible)
+        self.update()
+
+    def set_is_chrome_visible(self, visible: bool):
+        self._is_chrome_visible = visible
+        self.control_widget.setVisible(visible)
+        if not visible:
+            self.floating_progress.hide()
+        self.border_widget.setVisible(visible and self._is_active)
+        self.update()
 
     @pyqtSlot(bool)
     def set_volume_button_visible(self, is_visible):
         self.volume_button.setVisible(is_visible)
 
+    def set_drop_indicator(self, indicator: DropIndicator):
+        self.drop_indicator.set_indicator(indicator)
+        if indicator != DropIndicator.NONE:
+            self.drop_indicator.raise_()
+        self.update()
+
     def _set_opacity(self, opacity):
-        effect = QGraphicsOpacityEffect(self)
-        effect.setOpacity(opacity)
-        self.setGraphicsEffect(effect)
+        # Opacity lives on each OverlayWidget, not on this parent. A single
+        # QGraphicsOpacityEffect here cached the whole tree and left seams
+        # when the seek timer moved. Per-widget effects fade an already
+        # composited control (readable text/icons) without recaching siblings.
+        self.setGraphicsEffect(None)
+        self._overlay_opacity = opacity
+        for widget in self.findChildren(OverlayWidget):
+            widget.set_overlay_opacity(opacity)
 
 
 class OverlayBlockFloating(OverlayBlock):
@@ -275,12 +310,30 @@ class OverlayBlockFloating(OverlayBlock):
 
         self.init_flags()
 
-        if Settings().get("internal/opaque_hw_overlay"):
+        self.is_opaque = False
+
+        if env.IS_LINUX and should_make_overlay_opaque():
             self.make_opaque()
-        else:
-            self.is_opaque = False
 
         self.parent().window().installEventFilter(self)
+
+    @pyqtSlot(str)
+    def set_color(self, color):
+        super().set_color(color)
+        self._sync_opaque_window_color()
+
+    @pyqtSlot(bool)
+    def set_is_active(self, is_active):
+        super().set_is_active(is_active)
+        self.refresh_opaque_mask()
+
+    def set_is_chrome_visible(self, visible: bool):
+        super().set_is_chrome_visible(visible)
+        self.refresh_opaque_mask()
+
+    def set_drop_indicator(self, indicator: DropIndicator):
+        super().set_drop_indicator(indicator)
+        self.refresh_opaque_mask()
 
     def ensure_black_text(self):
         """Some window managers make text look gray when window is out of focus"""
@@ -314,14 +367,20 @@ class OverlayBlockFloating(OverlayBlock):
             | Qt.NoDropShadowWindowHint
         )
 
+        # workaround to avoid some compositors (KWin) making overlay opaque
+        if env.IS_LINUX:
+            self.setWindowOpacity(0.999)
+
     def make_opaque(self):
         self.setAttribute(Qt.WA_NoSystemBackground, False)
         self.setAttribute(Qt.WA_TranslucentBackground, False)
 
         self.setGraphicsEffect(None)
 
+        self._set_opacity(1.0)
         self.floating_progress.is_opaque = True
         self.is_opaque = True
+        self._sync_opaque_window_color()
 
     def setGeometry(self, rect):
         new_pos = self.parent().mapToGlobal(QPoint())
@@ -337,21 +396,57 @@ class OverlayBlockFloating(OverlayBlock):
         event.accept()
 
     def paintEvent(self, event):
-        if self.is_opaque:
-            # 0 coord to keep children from sliding off
-            mask = QRegion(QRect(0, 0, 1, 1))
+        if not self.is_opaque:
+            return
 
-            for child in self.findChildren(OverlayWidget):
-                if child.isVisible():
-                    if child.mask():
-                        mask += child.mask().translated(child.pos())
-                    else:
-                        mask += QRegion(child.geometry())
+        new_mask = self._opaque_mask()
+        # setMask during paint clips to the old shape, so any newly shown
+        # child (the border ring) would not be drawn this frame.
+        if new_mask != self.mask():
+            self.setMask(new_mask)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.refresh_opaque_mask()
+
+    def refresh_opaque_mask(self):
+        if not self.is_opaque:
+            return
+
+        self.setMask(self._opaque_mask())
+
+    def _opaque_mask(self) -> QRegion:
+        dummy = QRegion(QRect(0, 0, 1, 1))
+        mask = QRegion(dummy)
+        has_shape = False
+
+        for child in self.findChildren(OverlayWidget):
+            if not child.isVisible():
+                continue
+            has_shape = True
+            child_mask = child.mask()
+            if not child_mask.isEmpty():
+                mask += child_mask.translated(child.pos())
+            else:
+                mask += QRegion(child.geometry())
+
+        if has_shape:
             if not self.border_widget.isVisible():
-                mask -= QRegion(QRect(0, 0, 1, 1))
+                mask -= dummy
+            return mask
 
-            self.setMask(mask)
+        # Empty mask is treated as unmasked on X11, so the opaque window
+        # would cover the whole video. Keep a 1px hole while mapped.
+        return dummy
+
+    def _sync_opaque_window_color(self):
+        if not self.is_opaque:
+            return
+
+        pal = self.palette()
+        pal.setColor(QPalette.Window, self.border_widget.color)
+        self.setPalette(pal)
+        self.setAutoFillBackground(True)
 
     def move_to_parent(self):
         new_pos = self.parent().mapToGlobal(QPoint())
@@ -384,7 +479,9 @@ class OverlayBlockFloating(OverlayBlock):
         if event.type() in PROPAGATED_EVENTS:
             QApplication.sendEvent(self.parent(), event)
         elif event.type() in PROPAGATED_EVENTS_FILTERED:
-            self.parent().window().filter_event(event)
+            # pos() is overlay-local; pass this widget so hit-testing can map it
+            self.parent().window().filter_event(event, source=self)
+            return True
 
         return super().event(event)
 

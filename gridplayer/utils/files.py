@@ -37,7 +37,13 @@ def extract_mime_uris(dnd_data: QMimeData) -> list[str]:
 
 
 def _filter_uris(uris: list[str]) -> list[str]:
-    return [u for u in uris if is_url(u) or Path(u).is_file()]
+    def _is_existing_file(u: str) -> bool:
+        try:
+            return Path(u).is_file()
+        except OSError:
+            return False
+
+    return [u for u in uris if is_url(u) or _is_existing_file(u)]
 
 
 def get_playlist_path(uris: list[str | Path]) -> Path | None:

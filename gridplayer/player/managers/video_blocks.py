@@ -88,6 +88,17 @@ class VideoBlocks:
         self._blocks[idx2] = old1
         self._blocks[idx1] = old2
 
+    def move(self, block, index: int):
+        old = self._blocks.index(block)
+        if index > old:
+            index -= 1
+        if index == old:
+            return
+
+        self._blocks.remove(block)
+        index = max(0, min(index, len(self._blocks)))
+        self._blocks.insert(index, block)
+
 
 class VideoBlocksManager(ManagerBase):
     video_count_changed = pyqtSignal(int)
@@ -97,6 +108,7 @@ class VideoBlocksManager(ManagerBase):
     reload_all_closed = pyqtSignal()
 
     hide_overlay = pyqtSignal()
+    set_drag_ui = pyqtSignal(bool)
     set_pause = pyqtSignal(bool)
 
     close_all_signal = pyqtSignal()
@@ -143,10 +155,14 @@ class VideoBlocksManager(ManagerBase):
 
         self._ctx.seek_sync_mode = Settings().get("playlist/seek_sync_mode")
         self._ctx.is_shuffle_on_load = Settings().get("playlist/shuffle_on_load")
-        self._ctx.is_disable_click_pause = Settings().get(
-            "playlist/disable_click_pause"
+        self._ctx.is_disable_mouse_click_events = Settings().get(
+            "playlist/disable_mouse_click_events"
         )
-        self._ctx.is_disable_wheel_seek = Settings().get("playlist/disable_wheel_seek")
+        self._ctx.is_disable_mouse_wheel_events = Settings().get(
+            "playlist/disable_mouse_wheel_events"
+        )
+        self._ctx.is_disable_overlay = Settings().get("playlist/disable_overlay")
+        self._ctx.is_drag_ui = False
 
         self._ctx.video_blocks = VideoBlocks()
 
@@ -176,12 +192,20 @@ class VideoBlocksManager(ManagerBase):
             "is_shuffle_on_load": lambda: self._ctx.is_shuffle_on_load,
             "set_shuffle_on_load": self.set_shuffle_on_load,
             "toggle_shuffle_on_load": self.toggle_shuffle_on_load,
-            "is_disable_click_pause": lambda: self._ctx.is_disable_click_pause,
-            "set_disable_click_pause": self.set_disable_click_pause,
-            "toggle_disable_click_pause": self.toggle_disable_click_pause,
-            "is_disable_wheel_seek": lambda: self._ctx.is_disable_wheel_seek,
-            "set_disable_wheel_seek": self.set_disable_wheel_seek,
-            "toggle_disable_wheel_seek": self.toggle_disable_wheel_seek,
+            "is_disable_mouse_click_events": lambda: (
+                self._ctx.is_disable_mouse_click_events
+            ),
+            "set_disable_mouse_click_events": self.set_disable_mouse_click_events,
+            "toggle_disable_mouse_click_events": self.toggle_disable_mouse_click_events,
+            "is_disable_mouse_wheel_events": lambda: (
+                self._ctx.is_disable_mouse_wheel_events
+            ),
+            "set_disable_mouse_wheel_events": self.set_disable_mouse_wheel_events,
+            "toggle_disable_mouse_wheel_events": self.toggle_disable_mouse_wheel_events,
+            "is_disable_overlay": lambda: self._ctx.is_disable_overlay,
+            "set_disable_overlay": self.set_disable_overlay,
+            "toggle_disable_overlay": self.toggle_disable_overlay,
+            "replace_with_block": self.replace_with_block,
         }
 
     def cmd_all(self, command, *args):
@@ -235,17 +259,35 @@ class VideoBlocksManager(ManagerBase):
     def toggle_shuffle_on_load(self):
         self._ctx.is_shuffle_on_load = not self._ctx.is_shuffle_on_load
 
-    def set_disable_click_pause(self, is_disable_click_pause):
-        self._ctx.is_disable_click_pause = is_disable_click_pause
+    def set_disable_mouse_click_events(self, is_disabled):
+        self._ctx.is_disable_mouse_click_events = is_disabled
 
-    def toggle_disable_click_pause(self):
-        self._ctx.is_disable_click_pause = not self._ctx.is_disable_click_pause
+    def toggle_disable_mouse_click_events(self):
+        self._ctx.is_disable_mouse_click_events = (
+            not self._ctx.is_disable_mouse_click_events
+        )
 
-    def set_disable_wheel_seek(self, is_disable_wheel_seek):
-        self._ctx.is_disable_wheel_seek = is_disable_wheel_seek
+    def set_disable_mouse_wheel_events(self, is_disabled):
+        self._ctx.is_disable_mouse_wheel_events = is_disabled
 
-    def toggle_disable_wheel_seek(self):
-        self._ctx.is_disable_wheel_seek = not self._ctx.is_disable_wheel_seek
+    def toggle_disable_mouse_wheel_events(self):
+        self._ctx.is_disable_mouse_wheel_events = (
+            not self._ctx.is_disable_mouse_wheel_events
+        )
+
+    def set_disable_overlay(self, is_disabled):
+        self._ctx.is_disable_overlay = is_disabled
+        if is_disabled:
+            self.hide_overlay.emit()
+
+    def toggle_disable_overlay(self):
+        self.set_disable_overlay(not self._ctx.is_disable_overlay)
+
+    def cmd_set_drag_ui(self, is_drag_ui: bool):
+        if self._ctx.is_drag_ui == is_drag_ui:
+            return
+        self._ctx.is_drag_ui = is_drag_ui
+        self.set_drag_ui.emit(is_drag_ui)
 
     def seek_sync_percent(self, percent):
         if self._ctx.seek_sync_mode == SeekSyncMode.PERCENT:
@@ -303,13 +345,45 @@ class VideoBlocksManager(ManagerBase):
         self.add_videos(self._videos_to_reload)
         self._videos_to_reload = []
 
-    def add_videos(self, videos):
-        if self._ctx.is_shuffle_on_load:
-            videos = list(videos)
+    def replace_with_block(self, dst, src):
+        if src is dst:
+            return
+
+        idx = self._ctx.video_blocks.index(dst)
+        dst.close_silently()
+        self._ctx.video_blocks.remove(dst)
+        self._ctx.video_blocks.move(src, idx)
+
+        self.video_count_changed.emit(len(self._ctx.video_blocks))
+
+    def add_videos(self, videos, index: int | None = None, is_replace=False):
+        videos = list(videos)
+
+        if index is not None and is_replace:
+            if not videos:
+                return
+
+            try:
+                replace_block = self._ctx.video_blocks[index]
+            except IndexError:
+                return
+
+            replace_block.set_video(videos[0])
+
+            videos = videos[1:]
+            if not videos:
+                return
+
+            index += 1
+
+        if self._ctx.is_shuffle_on_load and index is None:
             random.shuffle(videos)
 
-        for v in videos:
-            self._add_video_block(v)
+        added = [self._add_video_block(v) for v in videos]
+
+        if index is not None:
+            for offset, block in enumerate(added):
+                self._ctx.video_blocks.move(block, index + offset)
 
         self.video_count_changed.emit(len(self._ctx.video_blocks))
 
@@ -383,12 +457,15 @@ class VideoBlocksManager(ManagerBase):
             (self.all_previous_video, vb.previous_video),
             (self.all_next_video, vb.next_video),
             (self.hide_overlay, vb.hide_overlay),
+            (self.set_drag_ui, vb.set_drag_ui),
             (self.close_all_signal, vb.close_silently),
         )
 
         vb.set_video(video)
 
         self._ctx.video_blocks.append(vb)
+
+        return vb
 
     def _video_block_destroyed(self, _):
         self._live_video_blocks -= 1

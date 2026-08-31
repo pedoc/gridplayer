@@ -13,26 +13,21 @@ on:
 
 env:
   BUILD_PYTHON_VERSION: "3.10"
-  BUILD_POETRY_VERSION: "2.2.1"
 
 jobs:
   build_snap:
     runs-on: ubuntu-latest
-    env:
-      POETRY_VIRTUALENVS_CREATE: false
     steps:
-      - uses: actions/checkout@v6
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
 
       - name: Set up Python ${{ env.BUILD_PYTHON_VERSION }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.BUILD_PYTHON_VERSION }}
 
-      - name: Set up Poetry ${{ env.BUILD_POETRY_VERSION }}
-        uses: abatilo/actions-poetry@v4
-        with:
-          poetry-version: ${{ env.BUILD_POETRY_VERSION }}
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Install requirements
         run: |
@@ -48,7 +43,7 @@ jobs:
           path: build/snap
 
       - name: Save snapped app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snap_result
           path: ${{ steps.build.outputs.snap }}

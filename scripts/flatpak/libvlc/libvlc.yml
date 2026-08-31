@@ -70,8 +70,8 @@ post-install:
 - ${FLATPAK_DEST}/lib/vlc/vlc-cache-gen ${FLATPAK_DEST}/lib/vlc/plugins
 sources:
 - type: archive
-  url: https://download.videolan.org/videolan/vlc/3.0.21/vlc-3.0.21.tar.xz
-  sha256: 24dbbe1d7dfaeea0994d5def0bbde200177347136dbfe573f5b6a4cee25afbb0
+  url: https://download.videolan.org/videolan/vlc/3.0.23/vlc-3.0.23.tar.xz
+  sha256: e891cae6aa3ccda69bf94173d5105cbc55c7a7d9b1d21b9b21666e69eff3e7e0
 
 modules:
 - shared-modules/intltool/intltool-0.51.json
@@ -113,6 +113,7 @@ modules:
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     - -DWITH_MP4=ON
     - -DWITH_ASF=ON
+    - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   sources:
     - type: archive
       url: https://taglib.org/releases/taglib-1.13.1.tar.gz
@@ -155,8 +156,8 @@ modules:
     - --enable-fontconfig
   sources:
     - type: archive
-      url: https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.xz
-      sha256: eae425da50f0015c21f7b3a9c7262a910f0218af469e22e2931462fed3c50959
+      url: https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz
+      sha256: 2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc
     - type: script
       commands:
         - autoreconf -fiv
@@ -170,6 +171,7 @@ modules:
     - -DCMAKE_BUILD_TYPE=RelWithDebInfo
     - -DBUILD_SHARED_LIBS=ON
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   sources:
     - type: archive
       url: https://dl.matroska.org/downloads/libebml/libebml-1.4.5.tar.xz
@@ -183,6 +185,7 @@ modules:
     - -DCMAKE_BUILD_TYPE=RelWithDebInfo
     - -DBUILD_SHARED_LIBS=ON
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   sources:
     - type: archive
       url: https://dl.matroska.org/downloads/libmatroska/libmatroska-1.7.1.tar.xz
@@ -217,18 +220,19 @@ modules:
     - -DCMAKE_BUILD_TYPE=RelWithDebInfo
     - -DBUILD_SHARED_LIBS=ON
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   sources:
     - type: archive
-      url: https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz
-      sha256: a31699c6a89806b74b0151e5e6a7df65de4b49050482fe5ebf8a4379d7af8f29
+      url: https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.2.tar.gz
+      sha256: 40b1ea0453e0309f0eba934e0ddf533f8f6295966679e8894e8f1c1c8d5e1210
 - name: dav1d
   cleanup:
     - /bin
   buildsystem: meson
   sources:
     - type: archive
-      url: https://download.videolan.org/videolan/dav1d/1.5.0/dav1d-1.5.0.tar.xz
-      sha256: 14bd6f5157808ed9aedcafbe50df689d304fd4810ac20be6eec1ab037436afd6
+      url: https://download.videolan.org/videolan/dav1d/1.5.3/dav1d-1.5.3.tar.xz
+      sha256: 732010aa5ef461fa93355ed2c6c5fedb48ddc4b74e697eaabe8907eaeb943011
 - name: ffmpeg
   cleanup:
     - /bin
@@ -247,17 +251,8 @@ modules:
     - --enable-libopus
   sources:
     - type: archive
-      url: https://ffmpeg.org/releases/ffmpeg-4.4.6.tar.xz
-      sha256: 2290461f467c08ab801731ed412d8e724a5511d6c33173654bd9c1d2e25d0617
-- name: libgcrypt
-  config-opts:
-    - --disable-static
-    - --disable-doc
-  sources:
-    - type: git
-      url: https://dev.gnupg.org/source/libgcrypt.git
-      tag: libgcrypt-1.10.3
-      commit: aa1610866f8e42bdc272584f0a717f32ee050a22
+      url: https://ffmpeg.org/releases/ffmpeg-4.4.8.tar.xz
+      sha256: c73848c4ae283d9eaee7be3b276affbc3543380483555500d0dd2c9b7e1c39c3
 - name: libaacs
   cleanup:
     - /bin
@@ -269,12 +264,19 @@ modules:
     - type: archive
       url: https://download.videolan.org/videolan/libaacs/0.11.1/libaacs-0.11.1.tar.bz2
       sha256: a88aa0ebe4c98a77f7aeffd92ab3ef64ac548c6b822e8248a8b926725bea0a39
+    - type: shell
+      commands:
+        - rm --force --verbose m4/libgcrypt.m4
+        - autoreconf --force --install --verbose
+        - libtoolize
 - name: fluidlite
   buildsystem: cmake-ninja
   config-opts:
     - -DCMAKE_BUILD_TYPE=RelWithDebInfo
     - -DBUILD_SHARED_LIBS=ON
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    - -DENABLE_SF3=YES
+    - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   sources:
     - type: git
       url: https://github.com/divideconcept/FluidLite.git
@@ -296,6 +298,7 @@ modules:
     - -DCMAKE_BUILD_TYPE=RelWithDebInfo
     - -DBUILD_SHARED_LIBS=ON
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   sources:
     - type: archive
       url: https://github.com/videolabs/libspatialaudio/releases/download/0.3.0/spatialaudio-0.3.0.tar.bz2
@@ -309,10 +312,11 @@ modules:
     - -DCMAKE_BUILD_TYPE=RelWithDebInfo
     - -DBUILD_SHARED_LIBS=ON
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   sources:
     - type: archive
-      url: https://github.com/Haivision/srt/archive/v1.5.3.tar.gz
-      sha256: befaeb16f628c46387b898df02bc6fba84868e86a6f6d8294755375b9932d777
+      url: https://github.com/Haivision/srt/archive/v1.5.5.tar.gz
+      sha256: c3518bc43a71b5289032395b2db4c3e09e73d78b54247d56c14553a503b491cf
 - name: live555
   buildsystem: simple
   build-commands:

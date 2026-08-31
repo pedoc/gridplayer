@@ -1,17 +1,24 @@
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.11.30,<0.13.0"]
+build-backend = "uv_build"
 
 [project]
 name = "gridplayer"
-version = "0.5.4"
+version = "0.5.5"
 description = "Play videos side-by-side"
-authors = [
-  { name = "vzhd1701", email = "vzhd1701@gmail.com" }
-]
+authors = [{ name = "vzhd1701", email = "vzhd1701@gmail.com" }]
+requires-python = ">=3.10"
 readme = "README.md"
+license-files = ["LICENSE"]
 license = "GPL-3.0-or-later"
-keywords = ["video", "player", "vlc", "pyqt", "Qt5", "multimedia"]
+keywords = [
+    "video",
+    "player",
+    "vlc",
+    "pyqt",
+    "Qt5",
+    "multimedia",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
@@ -22,38 +29,39 @@ classifiers = [
     "Operating System :: Unix",
     "Topic :: Multimedia :: Video :: Display",
 ]
-requires-python = ">=3.10"
 dependencies = [
     "PyQt5==5.15.11",
     "PyQt5-Qt5==5.15.2 ; sys_platform == 'win32'",
-    "PyQt5-Qt5==5.15.2 ; sys_platform == 'linux'",
-    "PyQt5-Qt5==5.15.18 ; sys_platform == 'darwin'",
+    "PyQt5-Qt5==5.15.19 ; sys_platform != 'win32'",
     "pydantic (>=2.12.5,<3.0.0)",
-    "streamlink (>=8.1.0,<9.0.0)",
-    "yt-dlp[default] (>=2025.12.8,<2026.0.0)",
+    "pydantic-extra-types (>=2.10.6,<3.0.0)",
+    "streamlink (>=8.4.0,<9.0.0)",
+    "yt-dlp[default] (>=2026.07.04,<2027.0.0)",
     "pyobjc-core ; sys_platform == 'darwin'",
     "pyobjc-framework-Cocoa ; sys_platform == 'darwin'",
-    "pydantic-extra-types (>=2.10.6,<3.0.0)",
 ]
 
 [project.urls]
 repository = "https://github.com/vzhd1701/gridplayer"
 changelog = "https://github.com/vzhd1701/gridplayer/blob/master/CHANGELOG.md"
+issues = "https://github.com/vzhd1701/gridplayer/issues"
 
 [project.scripts]
 gridplayer = "gridplayer.__main__:main"
 
 [dependency-groups]
 dev = [
-    "mdformat==1.0.0",
-    "pre-commit>=2.15.0",
-    "pytest>=7.1.2",
-    "keepachangelog>=1.0.0",
-    "ruff (>=0.14.10,<0.15.0)",
+    "keepachangelog==2.0.0",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "ruff",
+    "rumdl",
 ]
 
-[tool.poetry.group.dev]
-optional = true
+[tool.uv.build-backend]
+module-root = ""
 
 [tool.ruff]
 extend-exclude = ["gridplayer/resources_bin.py", "gridplayer/vlc_player/vlc.py"]
@@ -115,3 +123,14 @@ ignore = [
 
 [tool.ruff.lint.extend-per-file-ignores]
 "__main__.py" = ["E402"]
+"*_ui.py" = ["E402"]
+
+[tool.ty.src]
+exclude = ["tests"]
+
+[tool.rumdl]
+disable = ["MD013"]
+exclude = ["LICENSE.md"]
+
+[tool.rumdl.per-file-ignores]
+"README.md" = ["MD033", "MD041"]

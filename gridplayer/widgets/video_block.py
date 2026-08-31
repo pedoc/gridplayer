@@ -31,6 +31,7 @@ from gridplayer.params.static import (
     VideoTransform,
 )
 from gridplayer.settings import Settings
+from gridplayer.utils.drop_zone import DropIndicator
 from gridplayer.utils.libvlc_options_parser import get_vlc_options
 from gridplayer.utils.next_file import next_video_file, previous_video_file
 from gridplayer.utils.qt import qt_connect, translate
@@ -167,6 +168,7 @@ class VideoBlock(QWidget):
         # Runtime Params
         self._is_error = False
         self._is_active = False
+        self._is_closing = False
 
         self._title = None
         self._color = None
@@ -375,6 +377,11 @@ class VideoBlock(QWidget):
         self.close(notify=False)
 
     def close(self, notify=True):
+        if self._is_closing:
+            return
+
+        self._is_closing = True
+
         self._log.debug(f"Closing video block {self.id}")
 
         if notify:
@@ -386,22 +393,16 @@ class VideoBlock(QWidget):
         self.cleanup()
         event.accept()
 
-    @only_initialized
-    @only_seekable
     def wheelEvent(self, event):
-        if self._ctx.is_disable_wheel_seek:
+        if self._ctx.is_disable_mouse_wheel_events:
             event.ignore()
             return
 
-        is_shift_forward = event.angleDelta().y() < 0
-        is_big_shift = event.modifiers() & Qt.ShiftModifier
-
-        shift_percent = 5 if is_big_shift else 1
-
-        if is_shift_forward:
-            self.manual_seek("seek_shift_percent", shift_percent)
-        else:
-            self.manual_seek("seek_shift_percent", -shift_percent)
+        if self._dispatch_mouse_action(event):
+            # Accept so the event does not bubble to Player and re-trigger
+            # the same mouse shortcut (e.g. open Settings twice).
+            event.accept()
+            return
 
         event.ignore()
 
@@ -411,16 +412,34 @@ class VideoBlock(QWidget):
 
         super().mousePressEvent(event)
 
-    @only_initialized
     def mouseReleaseEvent(self, event) -> None:
-        if self._ctx.is_disable_click_pause:
+        if self._ctx.is_disable_mouse_click_events:
             event.ignore()
             return
 
-        if event.button() == Qt.LeftButton:
-            self.play_pause()
+        if self._dispatch_mouse_action(event):
+            event.accept()
+            return
 
         event.ignore()
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        if self._ctx.is_disable_mouse_click_events:
+            event.ignore()
+            return
+
+        if self._dispatch_mouse_action(event):
+            event.accept()
+            return
+
+        event.ignore()
+
+    def _dispatch_mouse_action(self, event) -> bool:
+        try:
+            actions_manager = self._ctx.actions_manager
+        except KeyError:
+            return False
+        return actions_manager.handle_mouse_event(event)
 
     def hideEvent(self, event):
         self.hide_overlay()
@@ -634,13 +653,49 @@ class VideoBlock(QWidget):
 
         return self.video_params.loop_end
 
+    def set_drop_indicator(self, indicator: DropIndicator):
+        self.overlay.set_drop_indicator(indicator)
+        if indicator != DropIndicator.NONE:
+            self.overlay.show()
+            self.overlay_hide_timer.stop()
+            return
+
+        # Translucent overlays stay mapped (X11 DND hide/show loops).
+        # Opaque HW overlays must not: empty mask = full opaque window.
+        if self._ctx.is_drag_ui and getattr(self.overlay, "is_opaque", False):
+            self.overlay.hide()
+
+    def set_drag_ui(self, is_drag_ui: bool):
+        self.overlay.set_is_chrome_visible(not is_drag_ui)
+        if is_drag_ui:
+            self.overlay_hide_timer.stop()
+            return
+
+        self.overlay.set_drop_indicator(DropIndicator.NONE)
+        if self._ctx.is_disable_overlay or Settings().get("misc/overlay_hide"):
+            self.overlay_hide_timer.stop()
+            self.overlay.hide()
+            return
+        self.show_overlay()
+
     @only_initialized
     def show_overlay(self):
+        if self._ctx.is_drag_ui or self._ctx.is_disable_overlay:
+            return
+
         self.overlay.show()
         if Settings().get("misc/overlay_hide"):
             self.overlay_hide_timer.start(1000 * Settings().get("misc/overlay_timeout"))
 
     def hide_overlay(self):
+        if self._ctx.is_drag_ui:
+            return
+
+        if self._ctx.is_disable_overlay:
+            self.overlay_hide_timer.stop()
+            self.overlay.hide()
+            return
+
         if not Settings().get("misc/overlay_hide"):
             return
 
@@ -807,10 +862,6 @@ class VideoBlock(QWidget):
 
         self.video_status.hide()
         self.show_overlay()
-
-        # Must do this after video is shown to ensure proper initial state (VLC lag)
-        if self.video_params.is_paused:
-            self.seek(self.video_params.current_position)
 
         self.video_driver.adjust_view()
 

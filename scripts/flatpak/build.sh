@@ -17,9 +17,9 @@ if ! command -v flatpak; then
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 fi
 
-flatpak install --system -y flathub org.kde.Platform//5.15-24.08
-flatpak install --system -y flathub org.kde.Sdk//5.15-24.08
-flatpak install --system -y flathub com.riverbankcomputing.PyQt.BaseApp//5.15-24.08
+flatpak install --system -y flathub org.kde.Platform//5.15-25.08
+flatpak install --system -y flathub org.kde.Sdk//5.15-25.08
+flatpak install --system -y flathub com.riverbankcomputing.PyQt.BaseApp//5.15-25.08
 flatpak install --system -y flathub org.flatpak.Builder
 
 # Preparation
@@ -33,6 +33,7 @@ if [ ! -f "$BUILD_DIR/flatpak_python_deps/dependencies.yml" ]; then
     "$SCRIPT_DIR/generate_dependencies.sh"
 fi
 cp "$BUILD_DIR/flatpak_python_deps/dependencies.yml" "$BUILD_DIR_FLATPAK/dependencies.yml"
+cp "$BUILD_DIR/flatpak_python_deps/uv_build.yml" "$BUILD_DIR_FLATPAK/uv_build.yml"
 
 cat "$SCRIPT_DIR/app.yml" "$SCRIPT_DIR/app_local.yml" > "$BUILD_DIR_FLATPAK/$APP_ID.yml"
 replace_app_vars "$BUILD_DIR_FLATPAK/$APP_ID.yml"
@@ -44,7 +45,7 @@ sed -i "s#{TAR_FILE_SHA256}#$TAR_FILE_SHA256#g" "$BUILD_DIR_FLATPAK/$APP_ID.yml"
 
 if [ ! -d "$BUILD_DIR_FLATPAK/shared-modules" ]; then
     git clone -n https://github.com/flathub/shared-modules "$BUILD_DIR_FLATPAK/shared-modules"
-    (cd "$BUILD_DIR_FLATPAK/shared-modules" && git checkout -q 0529b121864669aa14fac1c67b5684a4bc6542b8)
+    (cd "$BUILD_DIR_FLATPAK/shared-modules" && git checkout -q b8236c7961e3dd447b1b9605375a54a12f9f24b6)
 fi
 
 # Prevent strange freezing
